@@ -224,17 +224,38 @@ location ${URL_PATH} {
 }
 EOF
 
-# Candidate site files: every enabled config (plus the built-in one) that has a
-# server block listening on 80, excluding our own managed files.
-collect_sites() {
-  for f in "$NGINX_ROOT"/sites-enabled/* "$NGINX_ROOT"/conf.d/*.conf "$NGINX_ROOT"/nginx.conf; do
-    [ -f "$f" ] || continue
-    rp="$(realpath "$f" 2>/dev/null || printf '%s' "$f")"
-    case "$rp" in *"${APP_NAME}"*) continue ;; esac
-    grep -Eq '^[[:space:]]*listen[^;]*[[:space:]:]80([[:space:];]|$)' "$rp" && printf '%s\n' "$rp"
-  done
+# Candidate site files: follow nginx's own include directives starting from
+# nginx.conf, so server blocks are found wherever they are kept. Only files that
+# really listen on port 80 are touched, and our own files are skipped.
+VISITED=""
+WALKED=""
+walk_conf() {
+  local file="$1" depth="$2" real dir inc m
+  [ -f "$file" ] || return 0
+  real="$(realpath "$file" 2>/dev/null || printf '%s' "$file")"
+  case " $VISITED " in *" $real "*) return 0 ;; esac
+  VISITED="$VISITED $real"
+  WALKED="$WALKED $real"
+  [ "$depth" -ge 3 ] && return 0
+  dir="$(dirname "$real")"
+  while IFS= read -r inc; do
+    [ -n "$inc" ] || continue
+    case "$inc" in /*) : ;; *) inc="$dir/$inc" ;; esac
+    # shellcheck disable=SC2086
+    for m in $inc; do
+      [ -f "$m" ] && walk_conf "$m" "$((depth + 1))"
+    done
+  done < <(grep -hoE '^[[:space:]]*include[[:space:]]+[^;]+;' "$real" 2>/dev/null \
+           | sed -E 's/^[[:space:]]*include[[:space:]]+//; s/;$//; s/["'\'']//g')
 }
-mapfile -t SITE_FILES < <(collect_sites | awk '!seen[$0]++')
+walk_conf "$NGINX_ROOT/nginx.conf" 0
+
+mapfile -t SITE_FILES < <(
+  for f in $WALKED; do
+    case "$f" in *"${APP_NAME}"*) continue ;; esac
+    grep -Eq '^[[:space:]]*listen[^;]*[[:space:]:]80([[:space:];]|$)' "$f" && printf '%s\n' "$f"
+  done | awk '!seen[$0]++'
+)
 
 ATTACHED=0
 for f in "${SITE_FILES[@]}"; do
