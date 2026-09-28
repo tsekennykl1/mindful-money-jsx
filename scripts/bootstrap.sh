@@ -20,10 +20,10 @@ AWS_REGION="${AWS_REGION:-ap-east-1}"
 APP_NAME="${APP_NAME:-mindful-money}"
 APP_ROOT="${APP_ROOT:-/opt/mindful-money}"
 APP_PORT="${APP_PORT:-3001}"
-APP_BASE_PATH="${APP_BASE_PATH:-/mindful-money}"   # URL folder; "/" = whole site
+APP_BASE_PATH="${APP_BASE_PATH-/mindful-money}"   # URL folder; "" = whole site (needs SERVER_NAME)
 SVC_USER="${SVC_USER:-mindfulmoney}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
-SERVER_NAME="${SERVER_NAME:-_}"          # only used if this app owns port 80
+SERVER_NAME="${SERVER_NAME:-_}"          # the app's own hostname; required when APP_BASE_PATH is empty
 KEEP_RELEASES="${KEEP_RELEASES:-5}"
 NGINX_ROOT="${NGINX_ROOT:-/etc/nginx}"   # override only for tests
 export AWS_DEFAULT_REGION="$AWS_REGION"
@@ -171,6 +171,16 @@ env PATH="$PATH" "$PM2_BIN" startup systemd -u "$SVC_USER" --hp "$SVC_HOME" >/de
 # the app shares the hostname with your other site instead of replacing it.
 mkdir -p "$SNIPPET_DIR"
 BACKUP_TS="$(date +%s)"
+
+# With no URL folder the app owns a whole hostname, so it must be told which one:
+# a block without a real name would capture traffic meant for the other sites.
+case "${SERVER_NAME:-_}" in
+  ""|"_")
+    if [ -z "$BASE_PATH" ]; then
+      echo "SERVER_NAME must name the app's hostname when APP_BASE_PATH is empty" >&2
+      exit 1
+    fi ;;
+esac
 backup() { [ -f "$1" ] && cp -a "$1" "$1.bak.$BACKUP_TS" || true; }
 
 # An older version of this script wrote one file holding both the upstream and a
@@ -258,6 +268,10 @@ mapfile -t SITE_FILES < <(
 )
 
 ATTACHED=0
+# A URL folder is shared with the site that already owns the hostname, so the
+# snippet is added to its server blocks. A dedicated hostname is not shared with
+# anyone: it gets its own block below instead.
+if [ -n "$BASE_PATH" ]; then
 for f in "${SITE_FILES[@]}"; do
   if grep -qF "$INCLUDE_LINE" "$f"; then
     ATTACHED=$((ATTACHED + 1))
@@ -273,8 +287,9 @@ for f in "${SITE_FILES[@]}"; do
   chmod --reference="$f.bak.$BACKUP_TS" "$f" 2>/dev/null || true
   ATTACHED=$((ATTACHED + 1))
 done
+fi
 
-if [ "$ATTACHED" -eq 0 ]; then
+if [ "$ATTACHED" -eq 0 ] || [ -z "$BASE_PATH" ]; then
   # Nothing else on :80 — this app owns the port, so write its own server block.
   if [ -d "$NGINX_ROOT/sites-available" ]; then
     NGINX_CONF="$NGINX_ROOT/sites-available/${APP_NAME}.conf"
@@ -322,11 +337,16 @@ fi
 # one in front of the app (CloudFront/ALB) may be any of them. 200 means the
 # answer really came from this app, not from the site behind it.
 CHECK_HOSTS="localhost"
+[ "${SERVER_NAME:-_}" != "_" ] && CHECK_HOSTS="$CHECK_HOSTS $SERVER_NAME"
+# In folder mode the app shares hostnames with other sites, so each of them is
+# worth probing. On its own hostname only that hostname should ever answer.
+if [ -n "$BASE_PATH" ]; then
 for f in "${SITE_FILES[@]}"; do
   while read -r h; do
     [ -n "$h" ] && [ "$h" != "_" ] && CHECK_HOSTS="$CHECK_HOSTS $h"
   done < <(grep -hoE 'server_name[^;]+;' "$f" | sed -e 's/server_name//' -e 's/;//' | tr -s ' \t' '\n')
 done
+fi
 for h in $CHECK_HOSTS; do
   code="$(curl -sS -o /dev/null -m 15 -w '%{http_code}' -H "Host: $h" "http://127.0.0.1${URL_PATH}" || printf '000')"
   if [ "$code" = "200" ]; then
