@@ -1,0 +1,107 @@
+# Deploy Mindful Money (frontend) to S3 + EC2
+#
+# On every push to main (or manual run):
+#   1. Builds the app as a Node server (NITRO_PRESET=node-server -> .output/).
+#   2. Uploads the zip to s3://<bucket>/mindful-money/releases/<commit>/.
+#   3. Uploads scripts/bootstrap.sh and marks the release as current.
+#   4. Tells the EC2 instance (via SSM) to run bootstrap.sh, which installs
+#      Node + PM2 + nginx (port 80 -> 3001) and restarts the app.
+#
+# One-time setup (GitHub -> Settings -> Secrets and variables -> Actions):
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for an IAM user with
+#   s3:PutObject + s3:GetObject on the bucket and ssm:SendCommand +
+#   ssm:GetCommandInvocation on the instance.
+# The EC2 instance role needs s3:GetObject/ListBucket on the bucket and
+# the AmazonSSMManagedInstanceCore policy.
+
+name: Deploy mindful-money
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-east-1
+  S3_BUCKET: s3general-148535751717-ap-east-1-an
+  S3_PREFIX: mindful-money
+  EC2_INSTANCE_ID: i-00c16218eb325facf
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-mindful-money
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Build (Node server output)
+        env:
+          NITRO_PRESET: node-server
+          # VITE_AUTH_ENABLED: "true"   # uncomment to turn on Cognito sign-in
+        run: bun run build
+
+      - name: Package the build
+        run: |
+          test -f .output/server/index.mjs || { echo "::error::.output/server/index.mjs missing"; exit 1; }
+          zip -qr mindful-money.zip .output package.json
+          ls -lh mindful-money.zip
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload build to S3
+        run: |
+          aws s3 cp mindful-money.zip \
+            "s3://$S3_BUCKET/$S3_PREFIX/releases/${{ github.sha }}/mindful-money.zip"
+          aws s3 cp scripts/bootstrap.sh \
+            "s3://$S3_BUCKET/$S3_PREFIX/scripts/bootstrap.sh"
+          echo "${{ github.sha }}" > release.txt
+          aws s3 cp release.txt "s3://$S3_BUCKET/$S3_PREFIX/current/release.txt"
+
+      - name: Tell EC2 to install the new release
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --region "$AWS_REGION" \
+            --document-name "AWS-RunShellScript" \
+            --timeout-seconds 900 \
+            --comment "Deploy mindful-money ${{ github.sha }}" \
+            --parameters 'commands=["set -euo pipefail","aws s3 cp s3://'"$S3_BUCKET"'/'"$S3_PREFIX"'/scripts/bootstrap.sh /tmp/mindful-money-bootstrap.sh --region '"$AWS_REGION"'","chmod +x /tmp/mindful-money-bootstrap.sh","S3_BUCKET='"$S3_BUCKET"' S3_PREFIX='"$S3_PREFIX"' RELEASE=${{ github.sha }} AWS_REGION='"$AWS_REGION"' /tmp/mindful-money-bootstrap.sh"]' \
+            --query "Command.CommandId" --output text)
+
+          echo "SSM command: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID" || true
+
+          OUTPUT=$(aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID")
+
+          echo "$OUTPUT" | jq -r '.StandardOutputContent' | tail -n 80
+          echo "$OUTPUT" | jq -r '.StandardErrorContent' | tail -n 40
+          STATUS=$(echo "$OUTPUT" | jq -r .Status)
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::SSM command failed with status: $STATUS"
+            exit 1
+          fi
