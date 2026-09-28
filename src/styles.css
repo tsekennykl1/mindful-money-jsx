@@ -1,0 +1,169 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Personal Finance design system.
+ * Ink-on-paper financial theme: neutral slate surfaces, a single blue accent,
+ * and dedicated positive/negative money tones. All values are oklch tokens.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-pos: var(--pos);
+  --color-pos-soft: var(--pos-soft);
+  --color-neg: var(--neg);
+  --color-neg-soft: var(--neg-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-surface: var(--surface);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.977 0.004 250);
+  --foreground: oklch(0.21 0.03 258);
+  --surface: oklch(0.955 0.006 250);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.03 258);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.03 258);
+
+  --primary: oklch(0.48 0.17 258);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --secondary: oklch(0.94 0.008 250);
+  --secondary-foreground: oklch(0.28 0.03 258);
+
+  --muted: oklch(0.95 0.006 250);
+  --muted-foreground: oklch(0.52 0.02 256);
+  --accent: oklch(0.93 0.02 252);
+  --accent-foreground: oklch(0.28 0.03 258);
+
+  --destructive: oklch(0.52 0.19 25);
+  --destructive-foreground: oklch(0.99 0.002 250);
+
+  --border: oklch(0.9 0.008 253);
+  --input: oklch(0.89 0.01 253);
+  --ring: oklch(0.48 0.17 258);
+
+  --pos: oklch(0.52 0.14 152);
+  --pos-soft: oklch(0.94 0.045 152);
+  --neg: oklch(0.52 0.19 22);
+  --neg-soft: oklch(0.95 0.035 22);
+  --info: oklch(0.48 0.17 258);
+  --info-soft: oklch(0.94 0.035 258);
+  --warn: oklch(0.58 0.14 70);
+  --warn-soft: oklch(0.95 0.05 80);
+
+  --header: oklch(0.24 0.04 258);
+  --header-foreground: oklch(0.97 0.004 250);
+}
+
+.dark {
+  --background: oklch(0.19 0.02 258);
+  --foreground: oklch(0.96 0.004 250);
+  --surface: oklch(0.23 0.025 258);
+  --card: oklch(0.24 0.025 258);
+  --card-foreground: oklch(0.96 0.004 250);
+  --popover: oklch(0.24 0.025 258);
+  --popover-foreground: oklch(0.96 0.004 250);
+  --primary: oklch(0.65 0.16 258);
+  --primary-foreground: oklch(0.16 0.02 258);
+  --secondary: oklch(0.3 0.03 258);
+  --secondary-foreground: oklch(0.96 0.004 250);
+  --muted: oklch(0.29 0.025 258);
+  --muted-foreground: oklch(0.7 0.02 256);
+  --accent: oklch(0.32 0.04 258);
+  --accent-foreground: oklch(0.96 0.004 250);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.98 0.002 250);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.65 0.16 258);
+  --pos: oklch(0.72 0.15 152);
+  --pos-soft: oklch(0.32 0.06 152);
+  --neg: oklch(0.7 0.16 22);
+  --neg-soft: oklch(0.32 0.07 22);
+  --info: oklch(0.7 0.14 258);
+  --info-soft: oklch(0.3 0.06 258);
+  --warn: oklch(0.75 0.13 75);
+  --warn-soft: oklch(0.32 0.06 75);
+  --header: oklch(0.16 0.02 258);
+  --header-foreground: oklch(0.96 0.004 250);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Native month/date pickers inherit the theme instead of looking foreign. */
+  input[type="month"],
+  input[type="date"] {
+    color-scheme: light;
+  }
+}
+
+/* Numeric cells: aligned digits, never wrapping mid-number. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Horizontal scroller that keeps a hairline edge hint on small screens. */
+@utility scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+@utility spin-slow {
+  animation: spin 1s linear infinite;
+}
