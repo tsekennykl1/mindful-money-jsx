@@ -117,14 +117,34 @@ ln -sfn "$REL_DIR" "$APP_ROOT/current"
 chown -R "$SVC_USER:$SVC_USER" "$APP_ROOT"
 
 # ── PM2 app (port 3001) ──────────────────────────────────────
+# Pin the interpreter to the Node verified above: a PM2 daemon started long ago
+# otherwise keeps forking the app with whatever old Node it was launched with.
+NODE_BIN="$(command -v node)"
 cat > "$APP_ROOT/ecosystem.config.cjs" <<EOF
+// Loads $APP_ROOT/.env (if present) into the app's environment. Done here rather
+// than with node's --env-file flag so it works on any Node the host may have.
+const fs = require("fs");
+const ENV_FILE = "$APP_ROOT/.env";
+const extra = {};
+if (fs.existsSync(ENV_FILE)) {
+  const unquote = (v) => {
+    v = v.trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    return v;
+  };
+  for (const line of fs.readFileSync(ENV_FILE, "utf8").split("\n")) {
+    if (!line.trim() || line.trim().startsWith("#")) continue;
+    const i = line.indexOf("=");
+    if (i > 0) extra[line.slice(0, i).trim()] = unquote(line.slice(i + 1));
+  }
+}
 module.exports = {
   apps: [{
-    name: "${APP_NAME}",
-    cwd: "${APP_ROOT}/current",
+    name: "$APP_NAME",
+    cwd: "$APP_ROOT/current",
     script: ".output/server/index.mjs",
-    node_args: "--env-file-if-exists=${APP_ROOT}/.env",
-    env: { NODE_ENV: "production", PORT: "${APP_PORT}", HOST: "127.0.0.1" },
+    interpreter: "$NODE_BIN",
+    env: { ...extra, NODE_ENV: "production", PORT: "$APP_PORT", HOST: "127.0.0.1" },
     max_memory_restart: "400M",
     autorestart: true,
   }],
@@ -135,6 +155,8 @@ chown "$SVC_USER:$SVC_USER" "$APP_ROOT/ecosystem.config.cjs"
 SVC_HOME="$(getent passwd "$SVC_USER" | cut -d: -f6)"
 run_pm2() { sudo -u "$SVC_USER" -H env PATH="$PATH" PM2_HOME="$SVC_HOME/.pm2" "$PM2_BIN" "$@"; }
 
+# Start a fresh daemon so the app is forked by the Node we just verified.
+run_pm2 kill >/dev/null 2>&1 || true
 run_pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
 run_pm2 start "$APP_ROOT/ecosystem.config.cjs"
 run_pm2 save
