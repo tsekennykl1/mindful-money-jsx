@@ -1,11 +1,14 @@
 # Deploy Mindful Money (frontend) to S3 + EC2
 #
 # On every push to main (or manual run):
-#   1. Builds the app as a Node server (NITRO_PRESET=node-server -> .output/).
+#   1. Builds the app as a Node server (NITRO_PRESET=node-server -> .output/),
+#      served from the /mindful-money/ folder (BASE_PATH below).
 #   2. Uploads the zip to s3://<bucket>/mindful-money/releases/<commit>/.
 #   3. Uploads scripts/bootstrap.sh and marks the release as current.
 #   4. Tells the EC2 instance (via SSM) to run bootstrap.sh, which installs
-#      Node + PM2 + nginx (port 80 -> 3001) and restarts the app.
+#      Node + PM2 + nginx and points /mindful-money/ at the app on port 3001.
+#
+# Result: https://<your-domain>/mindful-money/
 #
 # One-time setup (GitHub -> Settings -> Secrets and variables -> Actions):
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for an IAM user with
@@ -26,6 +29,8 @@ env:
   S3_BUCKET: s3general-148535751717-ap-east-1-an
   S3_PREFIX: mindful-money
   EC2_INSTANCE_ID: i-00c16218eb325facf
+  # URL folder the app is served from on the shared hostname.
+  BASE_PATH: /mindful-money
 
 permissions:
   contents: read
@@ -50,6 +55,7 @@ jobs:
       - name: Build (Node server output)
         env:
           NITRO_PRESET: node-server
+          VITE_BASE_PATH: ${{ env.BASE_PATH }}
           # VITE_AUTH_ENABLED: "true"   # uncomment to turn on Cognito sign-in
         run: bun run build
 
@@ -83,7 +89,7 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --timeout-seconds 900 \
             --comment "Deploy mindful-money ${{ github.sha }}" \
-            --parameters 'commands=["set -euo pipefail","aws s3 cp s3://'"$S3_BUCKET"'/'"$S3_PREFIX"'/scripts/bootstrap.sh /tmp/mindful-money-bootstrap.sh --region '"$AWS_REGION"'","chmod +x /tmp/mindful-money-bootstrap.sh","S3_BUCKET='"$S3_BUCKET"' S3_PREFIX='"$S3_PREFIX"' RELEASE=${{ github.sha }} AWS_REGION='"$AWS_REGION"' /tmp/mindful-money-bootstrap.sh"]' \
+            --parameters 'commands=["set -euo pipefail","aws s3 cp s3://'"$S3_BUCKET"'/'"$S3_PREFIX"'/scripts/bootstrap.sh /tmp/mindful-money-bootstrap.sh --region '"$AWS_REGION"'","chmod +x /tmp/mindful-money-bootstrap.sh","S3_BUCKET='"$S3_BUCKET"' S3_PREFIX='"$S3_PREFIX"' RELEASE=${{ github.sha }} AWS_REGION='"$AWS_REGION"' APP_BASE_PATH='"$BASE_PATH"' /tmp/mindful-money-bootstrap.sh"]' \
             --query "Command.CommandId" --output text)
 
           echo "SSM command: $COMMAND_ID"

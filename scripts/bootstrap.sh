@@ -2,8 +2,11 @@
 # Mindful Money frontend bootstrap — runs on EC2 (first boot / user-data, or
 # every deploy via SSM from .github/workflows/deploy.yml).
 #
-#   nginx  :80   -> reverse proxy (HTTPS terminated upstream by ALB/CloudFront)
-#   app    :3001 -> TanStack Start Node server, managed by PM2
+#   nginx  :80   /mindful-money/  ->  app :3001  (PM2, TanStack Start server)
+#
+# The app is served from a folder on the shared hostname, so the snippet below
+# is dropped into whichever nginx server block already owns port 80 — your other
+# site keeps serving "/" untouched. HTTPS terminates upstream (ALB/CloudFront).
 #
 # Idempotent — safe to re-run. Usage:
 #   S3_BUCKET=... S3_PREFIX=mindful-money RELEASE=<sha> AWS_REGION=ap-east-1 ./bootstrap.sh
@@ -17,11 +20,25 @@ AWS_REGION="${AWS_REGION:-ap-east-1}"
 APP_NAME="${APP_NAME:-mindful-money}"
 APP_ROOT="${APP_ROOT:-/opt/mindful-money}"
 APP_PORT="${APP_PORT:-3001}"
+APP_BASE_PATH="${APP_BASE_PATH:-/mindful-money}"   # URL folder; "/" = whole site
 SVC_USER="${SVC_USER:-mindfulmoney}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
-SERVER_NAME="${SERVER_NAME:-_}"          # e.g. "www.example.com"; "_" = default server
+SERVER_NAME="${SERVER_NAME:-_}"          # only used if this app owns port 80
 KEEP_RELEASES="${KEEP_RELEASES:-5}"
+NGINX_ROOT="${NGINX_ROOT:-/etc/nginx}"   # override only for tests
 export AWS_DEFAULT_REGION="$AWS_REGION"
+
+# Normalise the URL folder: "" when the app owns the site root, otherwise
+# "/mindful-money" (no trailing slash) plus "/mindful-money/" for locations.
+BASE_PATH="${APP_BASE_PATH%/}"
+BASE_PATH="${BASE_PATH#/}"
+BASE_PATH="/${BASE_PATH}"
+[ "$BASE_PATH" = "/" ] && BASE_PATH=""
+URL_PATH="${BASE_PATH}/"
+UPSTREAM="${APP_NAME//-/_}_app"
+NGINX_CONF_D="$NGINX_ROOT/conf.d"
+SNIPPET_DIR="$NGINX_ROOT/snippets"
+INCLUDE_LINE="include $SNIPPET_DIR/${APP_NAME}-location.conf;"
 
 # ── Package manager (AL2023 = dnf, Ubuntu = apt-get) ─────────
 if command -v dnf >/dev/null 2>&1; then
@@ -100,25 +117,13 @@ ln -sfn "$REL_DIR" "$APP_ROOT/current"
 chown -R "$SVC_USER:$SVC_USER" "$APP_ROOT"
 
 # ── PM2 app (port 3001) ──────────────────────────────────────
-# Wrapper: load optional .env then exec node (compatible with Node 18+).
-cat > "$APP_ROOT/start.sh" <<WRAPPER
-#!/usr/bin/env bash
-set -a
-# shellcheck source=/dev/null
-[ -f ${APP_ROOT}/.env ] && . ${APP_ROOT}/.env
-set +a
-exec node .output/server/index.mjs
-WRAPPER
-chmod +x "$APP_ROOT/start.sh"
-chown "$SVC_USER:$SVC_USER" "$APP_ROOT/start.sh"
-
 cat > "$APP_ROOT/ecosystem.config.cjs" <<EOF
 module.exports = {
   apps: [{
     name: "${APP_NAME}",
     cwd: "${APP_ROOT}/current",
-    script: "${APP_ROOT}/start.sh",
-    interpreter: "bash",
+    script: ".output/server/index.mjs",
+    node_args: "--env-file-if-exists=${APP_ROOT}/.env",
     env: { NODE_ENV: "production", PORT: "${APP_PORT}", HOST: "127.0.0.1" },
     max_memory_restart: "400M",
     autorestart: true,
@@ -136,23 +141,93 @@ run_pm2 save
 # Start PM2 (and the app) on reboot.
 env PATH="$PATH" "$PM2_BIN" startup systemd -u "$SVC_USER" --hp "$SVC_HOME" >/dev/null
 
-# ── nginx :80 -> :3001 (create or overwrite our own site file) ──
-if [ -d /etc/nginx/sites-available ]; then
-  NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}.conf"
-  ln -sfn "$NGINX_CONF" "/etc/nginx/sites-enabled/${APP_NAME}.conf"
-  rm -f /etc/nginx/sites-enabled/default
-else
-  NGINX_CONF="/etc/nginx/conf.d/${APP_NAME}.conf"
-fi
-[ -f "$NGINX_CONF" ] && cp "$NGINX_CONF" "$NGINX_CONF.bak.$(date +%s)"
+# ── nginx: publish the app under ${URL_PATH} on port 80 ──────
+# Files we manage ourselves:
+#   $NGINX_ROOT/conf.d/<app>-upstream.conf   (http level: the backend address)
+#   $NGINX_ROOT/snippets/<app>-location.conf (server level: the location blocks)
+# The snippet is then included by whichever server block already serves :80, so
+# the app shares the hostname with your other site instead of replacing it.
+mkdir -p "$SNIPPET_DIR"
+BACKUP_TS="$(date +%s)"
+backup() { [ -f "$1" ] && cp -a "$1" "$1.bak.$BACKUP_TS" || true; }
 
-cat > "$NGINX_CONF" <<EOF
-# Managed by mindful-money bootstrap.sh — HTTPS terminates upstream (ALB/CloudFront).
-upstream ${APP_NAME//-/_}_app {
+backup "$NGINX_CONF_D/${APP_NAME}-upstream.conf"
+cat > "$NGINX_CONF_D/${APP_NAME}-upstream.conf" <<EOF
+# Managed by ${APP_NAME} bootstrap.sh — backend address for the location snippet.
+upstream ${UPSTREAM} {
     server 127.0.0.1:${APP_PORT};
     keepalive 32;
 }
+EOF
 
+REDIRECT_LINE=""
+if [ -n "$BASE_PATH" ]; then
+  REDIRECT_LINE="location = ${BASE_PATH} { return 301 ${URL_PATH}; }"
+fi
+
+backup "$SNIPPET_DIR/${APP_NAME}-location.conf"
+cat > "$SNIPPET_DIR/${APP_NAME}-location.conf" <<EOF
+# Managed by ${APP_NAME} bootstrap.sh — include this inside a server block.
+${REDIRECT_LINE}
+
+location ${URL_PATH}assets/ {
+    proxy_pass http://${UPSTREAM};
+    proxy_set_header Host \$host;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+
+location ${URL_PATH} {
+    proxy_pass http://${UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    # Keep the upstream scheme (https from ALB/CloudFront) if provided.
+    proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+    proxy_read_timeout 60s;
+}
+EOF
+
+# Candidate site files: every enabled config (plus the built-in one) that has a
+# server block listening on 80, excluding our own managed files.
+collect_sites() {
+  for f in "$NGINX_ROOT"/sites-enabled/* "$NGINX_ROOT"/conf.d/*.conf "$NGINX_ROOT"/nginx.conf; do
+    [ -f "$f" ] || continue
+    rp="$(realpath "$f" 2>/dev/null || printf '%s' "$f")"
+    case "$rp" in *"${APP_NAME}"*) continue ;; esac
+    grep -Eq '^[[:space:]]*listen[^;]*[[:space:]:]80([[:space:];]|$)' "$rp" && printf '%s\n' "$rp"
+  done
+}
+mapfile -t SITE_FILES < <(collect_sites | awk '!seen[$0]++')
+
+ATTACHED=0
+for f in "${SITE_FILES[@]}"; do
+  if grep -qF "$INCLUDE_LINE" "$f"; then
+    ATTACHED=$((ATTACHED + 1))
+    continue
+  fi
+  backup "$f"
+  awk -v inc="$INCLUDE_LINE" '
+    { print }
+    /^[[:space:]]*server[[:space:]]*\{/ && !added { print "    " inc; added = 1 }
+  ' "$f" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"
+  chmod --reference="$f.bak.$BACKUP_TS" "$f" 2>/dev/null || true
+  ATTACHED=$((ATTACHED + 1))
+done
+
+if [ "$ATTACHED" -eq 0 ]; then
+  # Nothing else on :80 — this app owns the port, so write its own server block.
+  if [ -d "$NGINX_ROOT/sites-available" ]; then
+    NGINX_CONF="$NGINX_ROOT/sites-available/${APP_NAME}.conf"
+    ln -sfn "$NGINX_CONF" "$NGINX_ROOT/sites-enabled/${APP_NAME}.conf"
+  else
+    NGINX_CONF="$NGINX_CONF_D/${APP_NAME}.conf"
+  fi
+  backup "$NGINX_CONF"
+  cat > "$NGINX_CONF" <<EOF
+# Managed by ${APP_NAME} bootstrap.sh — HTTPS terminates upstream (ALB/CloudFront).
 server {
     listen 80;
     listen [::]:80;
@@ -160,55 +235,38 @@ server {
 
     client_max_body_size 10m;
 
-    location = /nginx-health {
-        access_log off;
-        return 200 "ok\n";
-    }
-
-    # Hashed build assets — cache aggressively.
-    location /assets/ {
-        proxy_pass http://${APP_NAME//-/_}_app;
-        proxy_set_header Host \$host;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    location / {
-        proxy_pass http://${APP_NAME//-/_}_app;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        # Keep the upstream scheme (https from ALB/CloudFront) if provided.
-        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
-        proxy_read_timeout 60s;
-    }
+    ${INCLUDE_LINE}
 }
 EOF
-
-# AL2023's default nginx.conf has its own "default_server" on :80 — only
-# drop it if it would collide and we are the default server.
-if [ "$SERVER_NAME" = "_" ] && [ -f /etc/nginx/nginx.conf ] && grep -q "listen\s*80 default_server" /etc/nginx/nginx.conf; then
-  cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak.$(date +%s)
-  sed -i 's/listen\s*80 default_server;/listen 80;/; s/listen\s*\[::\]:80 default_server;/listen [::]:80;/' /etc/nginx/nginx.conf
-  sed -i "s/listen 80;\n    listen \[::\]:80;/&/" "$NGINX_CONF"
-  sed -i 's/^    listen 80;$/    listen 80 default_server;/; s/^    listen \[::\]:80;$/    listen [::]:80 default_server;/' "$NGINX_CONF"
 fi
 
-nginx -t
+if ! nginx -t; then
+  echo "nginx -t failed — restoring the configs we touched" >&2
+  for f in "${SITE_FILES[@]}"; do
+    [ -f "$f.bak.$BACKUP_TS" ] && cp -a "$f.bak.$BACKUP_TS" "$f"
+  done
+  nginx -t || true
+  exit 1
+fi
 systemctl enable nginx
 systemctl reload nginx 2>/dev/null || systemctl restart nginx
 
 # ── Health check ─────────────────────────────────────────────
+APP_URL="http://127.0.0.1:${APP_PORT}${URL_PATH}"
 for i in $(seq 1 30); do
-  if curl -fsS -o /dev/null "http://127.0.0.1:${APP_PORT}/"; then break; fi
+  if curl -fsS -o /dev/null "$APP_URL"; then break; fi
   sleep 2
 done
-curl -fsS -o /dev/null "http://127.0.0.1:${APP_PORT}/" || { run_pm2 logs "$APP_NAME" --lines 80 --nostream || true; exit 1; }
-curl -fsS -o /dev/null -H "Host: ${SERVER_NAME/_/localhost}" "http://127.0.0.1/" || echo "WARN: nginx on :80 did not return 2xx"
+if ! curl -fsS -o /dev/null "$APP_URL"; then
+  run_pm2 logs "$APP_NAME" --lines 80 --nostream || true
+  exit 1
+fi
+curl -fsS -o /dev/null -H "Host: ${SERVER_NAME/_/localhost}" "http://127.0.0.1${URL_PATH}" \
+  || echo "WARN: nginx on :80 did not return 2xx for ${URL_PATH}"
 
 # ── Prune old releases ───────────────────────────────────────
 ls -1dt "$APP_ROOT"/releases/*/ 2>/dev/null | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf
 
-echo "Deployed $APP_NAME release $RELEASE (nginx :80 -> :${APP_PORT})"
+echo "Deployed $APP_NAME release $RELEASE"
+echo "  app    : http://127.0.0.1:${APP_PORT}${URL_PATH}"
+echo "  public : http://<your-domain>${URL_PATH}"
