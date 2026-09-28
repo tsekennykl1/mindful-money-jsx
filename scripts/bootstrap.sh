@@ -243,9 +243,11 @@ for f in "${SITE_FILES[@]}"; do
     continue
   fi
   backup "$f"
+  # Add it to every server block in the file, not just the first: a config often
+  # holds a plain-HTTP redirect block before the block that really serves traffic.
   awk -v inc="$INCLUDE_LINE" '
+    /^[[:space:]]*server[[:space:]]*\{/ { print; print "    " inc; next }
     { print }
-    /^[[:space:]]*server[[:space:]]*\{/ && !added { print "    " inc; added = 1 }
   ' "$f" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"
   chmod --reference="$f.bak.$BACKUP_TS" "$f" 2>/dev/null || true
   ATTACHED=$((ATTACHED + 1))
@@ -295,8 +297,23 @@ if ! curl -fsS -o /dev/null "$APP_URL"; then
   run_pm2 logs "$APP_NAME" --lines 80 --nostream || true
   exit 1
 fi
-curl -fsS -o /dev/null -H "Host: ${SERVER_NAME/_/localhost}" "http://127.0.0.1${URL_PATH}" \
-  || echo "WARN: nginx on :80 did not return 2xx for ${URL_PATH}"
+# Probe every hostname this box serves: each is a separate server block, and the
+# one in front of the app (CloudFront/ALB) may be any of them. 200 means the
+# answer really came from this app, not from the site behind it.
+CHECK_HOSTS="localhost"
+for f in "${SITE_FILES[@]}"; do
+  while read -r h; do
+    [ -n "$h" ] && [ "$h" != "_" ] && CHECK_HOSTS="$CHECK_HOSTS $h"
+  done < <(grep -hoE 'server_name[^;]+;' "$f" | sed -e 's/server_name//' -e 's/;//' | tr -s ' \t' '\n')
+done
+for h in $CHECK_HOSTS; do
+  code="$(curl -sS -o /dev/null -m 15 -w '%{http_code}' -H "Host: $h" "http://127.0.0.1${URL_PATH}" || printf '000')"
+  if [ "$code" = "200" ]; then
+    echo "ok   : http://$h${URL_PATH}"
+  else
+    echo "WARN : Host: $h returned $code for ${URL_PATH}"
+  fi
+done
 
 # ── Prune old releases ───────────────────────────────────────
 ls -1dt "$APP_ROOT"/releases/*/ 2>/dev/null | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf
