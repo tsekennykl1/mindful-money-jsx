@@ -2,13 +2,19 @@
 #
 # On every push to main (or manual run):
 #   1. Builds the app as a Node server (NITRO_PRESET=node-server -> .output/),
-#      served from the /mindful-money/ folder (BASE_PATH below).
+#      served from the root of its own hostname.
 #   2. Uploads the zip to s3://<bucket>/mindful-money/releases/<commit>/.
 #   3. Uploads scripts/bootstrap.sh and marks the release as current.
 #   4. Tells the EC2 instance (via SSM) to run bootstrap.sh, which installs
-#      Node + PM2 + nginx and points /mindful-money/ at the app on port 3001.
+#      Node + PM2 + nginx and gives the app its own site block on port 80.
 #
-# Result: https://<your-domain>/mindful-money/
+# Result: https://app.myfinance5051.com/
+#
+# Before the first run, the hostname has to exist and reach this server:
+#   - DNS: app.myfinance5051.com points at the CloudFront distribution (CNAME)
+#     or directly at the instance.
+#   - CloudFront: app.myfinance5051.com added as an Alternate Domain Name with a
+#     certificate covering it, and the origin sends Host: app.myfinance5051.com.
 #
 # One-time setup (GitHub -> Settings -> Secrets and variables -> Actions):
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for an IAM user with
@@ -29,8 +35,10 @@ env:
   S3_BUCKET: s3general-148535751717-ap-east-1-an
   S3_PREFIX: mindful-money
   EC2_INSTANCE_ID: i-00c16218eb325facf
-  # URL folder the app is served from on the shared hostname.
-  BASE_PATH: /mindful-money
+  # The app's own hostname. It is served from the site root, not a URL folder.
+  APP_HOSTNAME: app.myfinance5051.com
+  # Empty = whole site. Set to /some-folder to share a hostname instead.
+  BASE_PATH: ""
 
 permissions:
   contents: read
@@ -89,7 +97,7 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --timeout-seconds 900 \
             --comment "Deploy mindful-money ${{ github.sha }}" \
-            --parameters 'commands=["set -euo pipefail","aws s3 cp s3://'"$S3_BUCKET"'/'"$S3_PREFIX"'/scripts/bootstrap.sh /tmp/mindful-money-bootstrap.sh --region '"$AWS_REGION"'","chmod +x /tmp/mindful-money-bootstrap.sh","S3_BUCKET='"$S3_BUCKET"' S3_PREFIX='"$S3_PREFIX"' RELEASE=${{ github.sha }} AWS_REGION='"$AWS_REGION"' APP_BASE_PATH='"$BASE_PATH"' /tmp/mindful-money-bootstrap.sh"]' \
+            --parameters 'commands=["set -euo pipefail","aws s3 cp s3://'"$S3_BUCKET"'/'"$S3_PREFIX"'/scripts/bootstrap.sh /tmp/mindful-money-bootstrap.sh --region '"$AWS_REGION"'","chmod +x /tmp/mindful-money-bootstrap.sh","S3_BUCKET='"$S3_BUCKET"' S3_PREFIX='"$S3_PREFIX"' RELEASE=${{ github.sha }} AWS_REGION='"$AWS_REGION"' APP_BASE_PATH='"$BASE_PATH"' SERVER_NAME='"$APP_HOSTNAME"' /tmp/mindful-money-bootstrap.sh"]' \
             --query "Command.CommandId" --output text)
 
           echo "SSM command: $COMMAND_ID"
