@@ -151,6 +151,18 @@ mkdir -p "$SNIPPET_DIR"
 BACKUP_TS="$(date +%s)"
 backup() { [ -f "$1" ] && cp -a "$1" "$1.bak.$BACKUP_TS" || true; }
 
+# An older version of this script wrote one file holding both the upstream and a
+# server block. Kept around, its upstream would now be declared twice, so retire
+# anything we used to manage (a backup is written next to it first).
+for legacy in "$NGINX_CONF_D/${APP_NAME}.conf" \
+              "$NGINX_ROOT/sites-available/${APP_NAME}.conf" \
+              "$NGINX_ROOT/sites-enabled/${APP_NAME}.conf"; do
+  if [ -e "$legacy" ] || [ -L "$legacy" ]; then
+    backup "$legacy"
+    rm -f "$legacy"
+  fi
+done
+
 backup "$NGINX_CONF_D/${APP_NAME}-upstream.conf"
 cat > "$NGINX_CONF_D/${APP_NAME}-upstream.conf" <<EOF
 # Managed by ${APP_NAME} bootstrap.sh — backend address for the location snippet.
