@@ -181,7 +181,13 @@ case "${SERVER_NAME:-_}" in
       exit 1
     fi ;;
 esac
-backup() { [ -f "$1" ] && cp -a "$1" "$1.bak.$BACKUP_TS" || true; }
+# Keep the first backup of a run, so a later pass in the same run cannot overwrite
+# the pristine copy that a failed check restores from.
+backup() {
+  if [ -f "$1" ] && [ ! -e "$1.bak.$BACKUP_TS" ]; then
+    cp -a "$1" "$1.bak.$BACKUP_TS"
+  fi
+}
 
 # An older version of this script wrote one file holding both the upstream and a
 # server block. Kept around, its upstream would now be declared twice, so retire
@@ -266,6 +272,15 @@ mapfile -t SITE_FILES < <(
     grep -Eq '^[[:space:]]*listen[^;]*[[:space:]:]80([[:space:];]|$)' "$f" && printf '%s\n' "$f"
   done | awk '!seen[$0]++'
 )
+
+# Drop any include an earlier run left in another site's config. The app may have
+# moved from a URL folder to its own hostname, and a snippet written for the old
+# shape would break that site (two "location /" blocks in one server).
+for f in "${SITE_FILES[@]}"; do
+  grep -qF "$INCLUDE_LINE" "$f" || continue
+  backup "$f"
+  grep -vF "$INCLUDE_LINE" "$f" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"
+done
 
 ATTACHED=0
 # A URL folder is shared with the site that already owns the hostname, so the
