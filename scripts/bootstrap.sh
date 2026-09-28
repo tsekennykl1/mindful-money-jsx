@@ -100,13 +100,25 @@ ln -sfn "$REL_DIR" "$APP_ROOT/current"
 chown -R "$SVC_USER:$SVC_USER" "$APP_ROOT"
 
 # ── PM2 app (port 3001) ──────────────────────────────────────
+# Wrapper: load optional .env then exec node (compatible with Node 18+).
+cat > "$APP_ROOT/start.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -a
+# shellcheck source=/dev/null
+[ -f ${APP_ROOT}/.env ] && . ${APP_ROOT}/.env
+set +a
+exec node .output/server/index.mjs
+WRAPPER
+chmod +x "$APP_ROOT/start.sh"
+chown "$SVC_USER:$SVC_USER" "$APP_ROOT/start.sh"
+
 cat > "$APP_ROOT/ecosystem.config.cjs" <<EOF
 module.exports = {
   apps: [{
     name: "${APP_NAME}",
     cwd: "${APP_ROOT}/current",
-    script: ".output/server/index.mjs",
-    node_args: "--env-file-if-exists=${APP_ROOT}/.env",
+    script: "${APP_ROOT}/start.sh",
+    interpreter: "bash",
     env: { NODE_ENV: "production", PORT: "${APP_PORT}", HOST: "127.0.0.1" },
     max_memory_restart: "400M",
     autorestart: true,
