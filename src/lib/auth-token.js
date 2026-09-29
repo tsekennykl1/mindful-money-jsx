@@ -1,8 +1,7 @@
 // Cognito wiring, kept tiny and lazy.
 //
 // Auth is off unless VITE_AUTH_ENABLED === "true". When it is off, nothing from
-// aws-amplify is ever loaded and every request goes out as a plain fetch —
-// exactly the behaviour of the original app with the flag off.
+// aws-amplify is ever loaded and every request goes out as a plain fetch.
 
 export const AUTH_ENABLED = import.meta.env.VITE_AUTH_ENABLED === "true";
 
@@ -26,6 +25,8 @@ async function amplify() {
         Cognito: {
           userPoolId: COGNITO.userPoolId,
           userPoolClientId: COGNITO.userPoolClientId,
+          loginWith: { email: true },
+          signUpVerificationMethod: "code",
         },
       },
     });
@@ -34,12 +35,19 @@ async function amplify() {
   return auth;
 }
 
+async function need() {
+  const auth = await amplify();
+  if (!auth) throw new Error("Sign-in is not enabled");
+  return auth;
+}
+
+/** API Gateway's Cognito authorizer validates the ID token. */
 export async function getAccessToken() {
   const auth = await amplify();
   if (!auth) return null;
   try {
     const session = await auth.fetchAuthSession();
-    return session.tokens?.accessToken?.toString() ?? null;
+    return session.tokens?.idToken?.toString() ?? null;
   } catch {
     return null;
   }
@@ -56,9 +64,23 @@ export async function getCurrentUser() {
 }
 
 export async function signIn(username, password) {
-  const auth = await amplify();
-  if (!auth) throw new Error("Sign-in is not enabled");
+  const auth = await need();
   return auth.signIn({ username, password });
+}
+
+export async function signUp(email, password) {
+  const auth = await need();
+  return auth.signUp({ username: email, password, options: { userAttributes: { email } } });
+}
+
+export async function confirmSignUp(email, code) {
+  const auth = await need();
+  return auth.confirmSignUp({ username: email, confirmationCode: code });
+}
+
+export async function resendCode(email) {
+  const auth = await need();
+  return auth.resendSignUpCode({ username: email });
 }
 
 export async function signOut() {

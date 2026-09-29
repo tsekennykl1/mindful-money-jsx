@@ -64,7 +64,7 @@ jobs:
         env:
           NITRO_PRESET: node-server
           VITE_BASE_PATH: ${{ env.BASE_PATH }}
-          # VITE_AUTH_ENABLED: "true"   # uncomment to turn on Cognito sign-in
+          VITE_AUTH_ENABLED: "true"   # Cognito sign-in / sign-up screen; APIs require a token
         run: bun run build
 
       - name: Package the build
