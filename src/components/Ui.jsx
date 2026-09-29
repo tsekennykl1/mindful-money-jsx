@@ -138,20 +138,20 @@ export function Stat({ label, value, tone = "flat", hint, highlight }) {
 /* ── Dense responsive table ───────────────────────────── */
 
 /**
- * columns: [{ key, header, align, cell(row, i), sticky, priority }]
- *   priority 2 = hidden below sm, 3 = hidden below lg. Undefined = always shown.
+ * columns: [{ key, header, align, cell(row, i), sticky }]
+ * All fields stay available. The table fits as many columns as possible, then
+ * scrolls horizontally instead of hiding data on narrow screens.
  */
 export function DataTable({ columns, rows, rowKey, empty = "No data", footer }) {
   if (!rows || rows.length === 0) {
     return <div className="px-3 py-8 text-center text-xs text-muted-foreground">{empty}</div>;
   }
 
-  const hide = (p) => (p === 2 ? "hidden sm:table-cell" : p === 3 ? "hidden lg:table-cell" : "");
   const alignOf = (a) => (a === "right" ? "text-right" : a === "center" ? "text-center" : "text-left");
 
   return (
     <div className="scroll-x">
-      <table className="w-full min-w-full border-collapse text-[11px] sm:text-[13px]">
+      <table className="w-max min-w-full border-collapse text-[11px] sm:text-[13px]">
         <thead>
           <tr className="bg-surface text-muted-foreground">
             {columns.map((c) => (
@@ -160,7 +160,6 @@ export function DataTable({ columns, rows, rowKey, empty = "No data", footer }) 
                 className={cx(
                   "border-b border-border px-1.5 py-1.5 font-semibold whitespace-nowrap sm:px-2.5",
                   alignOf(c.align),
-                  hide(c.priority),
                   c.sticky && "sticky left-0 z-10 bg-surface"
                 )}
               >
@@ -176,9 +175,8 @@ export function DataTable({ columns, rows, rowKey, empty = "No data", footer }) 
                 <td
                   key={c.key}
                   className={cx(
-                    "border-b border-border px-1.5 py-1.5 sm:px-2.5",
+                    "border-b border-border px-1.5 py-1.5 whitespace-nowrap sm:px-2.5",
                     alignOf(c.align),
-                    hide(c.priority),
                     c.sticky && "sticky left-0 z-10 bg-card font-semibold"
                   )}
                 >

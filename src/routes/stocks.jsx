@@ -23,6 +23,8 @@ export const Route = createFileRoute("/stocks")({
       { name: "description", content: "Look up live prices, ranges, volume and P/E for any list of tickers." },
       { property: "og:title", content: "Live Stock Prices | Personal Finance" },
       { property: "og:description", content: "Look up live prices, ranges, volume and P/E for any list of tickers." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: StocksPage,

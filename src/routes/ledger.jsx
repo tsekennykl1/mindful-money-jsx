@@ -32,6 +32,8 @@ export const Route = createFileRoute("/ledger")({
       { name: "description", content: "Monthly income and expense ledger with categories, notes and net totals." },
       { property: "og:title", content: "Cash Ledger | Personal Finance" },
       { property: "og:description", content: "Monthly income and expense ledger with categories, notes and net totals." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: LedgerPage,

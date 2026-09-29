@@ -40,6 +40,8 @@ export const Route = createFileRoute("/transactions")({
       { name: "description", content: "Record, edit and review monthly stock buy and sell transactions." },
       { property: "og:title", content: "Stock Transactions | Personal Finance" },
       { property: "og:description", content: "Record, edit and review monthly stock buy and sell transactions." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: TransactionsPage,

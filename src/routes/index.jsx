@@ -45,6 +45,8 @@ export const Route = createFileRoute("/")({
         content:
           "Monthly portfolio dashboard: holdings, stock performance, dividends, ledger profit and loss, and quarterly and annual results.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,

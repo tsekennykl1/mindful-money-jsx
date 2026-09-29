@@ -3,14 +3,13 @@
 
 import { getAccessToken } from "./auth-token";
 
-export const API_BASE = "https://z35lnmmzgi.execute-api.ap-east-1.amazonaws.com/prod";
 export const API_BASE_JAVA = "https://7298nhfyc0.execute-api.ap-east-1.amazonaws.com/Prod";
 
 export const ENDPOINTS = {
   REPORT_CURRENT: `${API_BASE_JAVA}/api/v1/reports`,
   REPORT: (yearMonth) => `${API_BASE_JAVA}/api/v1/reports/${yearMonth}`,
-  STOCK: `${API_BASE}/getStockData`,
-  CRUD: `${API_BASE}/lambda_crud_handler`,
+  STOCK: "/api/stocks",
+  CRUD: "/api/crud",
 };
 
 /** fetch() with the Cognito bearer token attached when auth is on. */

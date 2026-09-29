@@ -36,6 +36,8 @@ export const Route = createFileRoute("/daily-expense")({
       { name: "description", content: "Log one day of spending by category and save it as a single ledger entry." },
       { property: "og:title", content: "Daily Expense Sheet | Personal Finance" },
       { property: "og:description", content: "Log one day of spending by category and save it as a single ledger entry." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: DailyExpensePage,

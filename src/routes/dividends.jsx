@@ -40,6 +40,8 @@ export const Route = createFileRoute("/dividends")({
       { name: "description", content: "Track dividend payments per stock, per month, with running totals." },
       { property: "og:title", content: "Dividend Records | Personal Finance" },
       { property: "og:description", content: "Track dividend payments per stock, per month, with running totals." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: DividendsPage,
