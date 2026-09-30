@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Browser CRUD and stock calls use same-origin `/api/crud` and `/api/stocks` server routes, which validate input and verify Cognito ID tokens before forwarding to AWS; this avoids dependency on API Gateway browser CORS.
+- AI category suggestions go through the signed-in `/api/categorize` server route (Lovable AI Gateway, Responses API, openai/gpt-6-astra); the key stays server-side and needs LOVABLE_API_KEY in the server environment.

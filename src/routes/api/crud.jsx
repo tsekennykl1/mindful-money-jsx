@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { verifiedBearer } from "../../lib/api-auth";
+import { verifiedBearer, authFailureMessage } from "../../lib/api-auth";
 
 const CRUD_URL = "https://z35lnmmzgi.execute-api.ap-east-1.amazonaws.com/prod/lambda_crud_handler";
 const ALLOWED_ACTIONS = new Set(["get", "get_all", "insert", "update", "delete"]);
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/crud")({
       POST: async ({ request }) => {
         const token = await verifiedBearer(request);
         if (!token) {
-          return jsonResponse({ error: "Sign in is required" }, 401);
+          return jsonResponse({ error: authFailureMessage(request) }, 401);
         }
 
         let body;

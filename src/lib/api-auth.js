@@ -52,14 +52,27 @@ async function verifyToken(token) {
 /** Return the verified bearer token, or null without exposing verification details. */
 export async function verifiedBearer(request) {
   const authorization = request.headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) return null;
+  if (!authorization?.startsWith("Bearer ")) {
+    console.warn("API auth: no bearer token on request");
+    return null;
+  }
 
   const token = authorization.slice(7).trim();
   if (!token) return null;
 
   try {
-    return (await verifyToken(token)) ? token : null;
-  } catch {
+    if (await verifyToken(token)) return token;
+    console.warn("API auth: token rejected (issuer/audience/expiry/signature)");
+    return null;
+  } catch (error) {
+    console.warn("API auth: token could not be parsed", error?.message);
     return null;
   }
+}
+
+/** User-facing 401 message that says whether a token arrived at all. */
+export function authFailureMessage(request) {
+  return request.headers.get("authorization")?.startsWith("Bearer ")
+    ? "Your sign-in could not be verified. Please sign out and sign in again."
+    : "Sign in is required (no sign-in token reached the server).";
 }

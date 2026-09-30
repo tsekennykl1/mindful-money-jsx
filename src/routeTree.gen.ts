@@ -15,6 +15,7 @@ import { Route as DividendsRouteImport } from './routes/dividends'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as StocksRouteImport } from './routes/stocks'
 import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as ApiCategorizeRouteImport } from './routes/api/categorize'
 import { Route as ApiCrudRouteImport } from './routes/api/crud'
 import { Route as ApiStocksRouteImport } from './routes/api/stocks'
 
@@ -48,6 +49,11 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCategorizeRoute = ApiCategorizeRouteImport.update({
+  id: '/api/categorize',
+  path: '/api/categorize',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCrudRoute = ApiCrudRouteImport.update({
   id: '/api/crud',
   path: '/api/crud',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/ledger': typeof LedgerRoute
   '/stocks': typeof StocksRoute
   '/transactions': typeof TransactionsRoute
+  '/api/categorize': typeof ApiCategorizeRoute
   '/api/crud': typeof ApiCrudRoute
   '/api/stocks': typeof ApiStocksRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/ledger': typeof LedgerRoute
   '/stocks': typeof StocksRoute
   '/transactions': typeof TransactionsRoute
+  '/api/categorize': typeof ApiCategorizeRoute
   '/api/crud': typeof ApiCrudRoute
   '/api/stocks': typeof ApiStocksRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/ledger': typeof LedgerRoute
   '/stocks': typeof StocksRoute
   '/transactions': typeof TransactionsRoute
+  '/api/categorize': typeof ApiCategorizeRoute
   '/api/crud': typeof ApiCrudRoute
   '/api/stocks': typeof ApiStocksRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/ledger'
     | '/stocks'
     | '/transactions'
+    | '/api/categorize'
     | '/api/crud'
     | '/api/stocks'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/ledger'
     | '/stocks'
     | '/transactions'
+    | '/api/categorize'
     | '/api/crud'
     | '/api/stocks'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/ledger'
     | '/stocks'
     | '/transactions'
+    | '/api/categorize'
     | '/api/crud'
     | '/api/stocks'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   LedgerRoute: typeof LedgerRoute
   StocksRoute: typeof StocksRoute
   TransactionsRoute: typeof TransactionsRoute
+  ApiCategorizeRoute: typeof ApiCategorizeRoute
   ApiCrudRoute: typeof ApiCrudRoute
   ApiStocksRoute: typeof ApiStocksRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/categorize': {
+      id: '/api/categorize'
+      path: '/api/categorize'
+      fullPath: '/api/categorize'
+      preLoaderRoute: typeof ApiCategorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/crud': {
       id: '/api/crud'
       path: '/api/crud'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   LedgerRoute: LedgerRoute,
   StocksRoute: StocksRoute,
   TransactionsRoute: TransactionsRoute,
+  ApiCategorizeRoute: ApiCategorizeRoute,
   ApiCrudRoute: ApiCrudRoute,
   ApiStocksRoute: ApiStocksRoute,
 }

@@ -17,6 +17,7 @@ import {
   inputClass,
 } from "../components/Ui";
 import { dollars, isISODate, todayISO, toISODate } from "../lib/format";
+import { AiSuggest } from "../components/AiSuggest";
 import {
   DEFAULT_DAILY_ROWS,
   buildDailyComment,
@@ -152,6 +153,15 @@ function DailyExpensePage() {
           <Spinner />
         </Card>
       ) : (
+        <div className="flex flex-col gap-3">
+        <AiSuggest
+          onApply={({ category, label }) =>
+            setRows((prev) => [
+              ...prev.filter((r) => r.category || r.amount || r.notes),
+              { category, amount: "", notes: label },
+            ])
+          }
+        />
         <form onSubmit={submit} className="flex flex-col gap-3">
           <Card>
             <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-surface px-2.5 py-2">
@@ -225,6 +235,7 @@ function DailyExpensePage() {
             </Button>
           </div>
         </form>
+        </div>
       )}
     </Page>
   );

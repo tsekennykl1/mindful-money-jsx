@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { verifiedBearer } from "../../lib/api-auth";
+import { verifiedBearer, authFailureMessage } from "../../lib/api-auth";
 
 const STOCK_URL = "https://z35lnmmzgi.execute-api.ap-east-1.amazonaws.com/prod/getStockData";
 const STOCK_LIST = /^[A-Za-z0-9.,_-]+$/;
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/stocks")({
       GET: async ({ request }) => {
         const token = await verifiedBearer(request);
         if (!token) {
-          return jsonResponse({ error: "Sign in is required" }, 401);
+          return jsonResponse({ error: authFailureMessage(request) }, 401);
         }
 
         const stocks = new URL(request.url).searchParams.get("stocks")?.trim() || "";
