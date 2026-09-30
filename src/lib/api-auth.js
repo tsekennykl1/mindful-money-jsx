@@ -30,6 +30,13 @@ async function getKeys() {
   return jwksPromise;
 }
 
+// Older Node servers have no global `crypto`; fall back to Node's Web Crypto.
+async function subtle() {
+  if (globalThis.crypto?.subtle) return globalThis.crypto.subtle;
+  const nodeCrypto = await import("node:crypto");
+  return nodeCrypto.webcrypto.subtle;
+}
+
 /** Returns "ok" or a short reason code. */
 async function verifyToken(token) {
   const parts = token.split(".");
@@ -44,14 +51,15 @@ async function verifyToken(token) {
 
   const jwk = (await getKeys()).find((key) => key.kid === header.kid);
   if (!jwk) return "unknown-key";
-  const key = await crypto.subtle.importKey(
+  const webCrypto = await subtle();
+  const key = await webCrypto.importKey(
     "jwk",
     jwk,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
     ["verify"]
   );
-  const valid = await crypto.subtle.verify(
+  const valid = await webCrypto.verify(
     "RSASSA-PKCS1-v1_5",
     key,
     decodePart(parts[2]),
