@@ -157,15 +157,15 @@ function TransactionsPage() {
     }
   };
 
-  const { buys, sells, buyTotal, sellTotal, sorted } = useMemo(() => {
+  const { buyTotal, sellTotal, buyCount, sellCount, sorted } = useMemo(() => {
     const buys = rows.filter((r) => r.type === "BUY");
     const sells = rows.filter((r) => r.type === "SELL");
     const sum = (list) => list.reduce((s, r) => s + num(r.total_amount), 0);
     return {
-      buys,
-      sells,
       buyTotal: sum(buys),
       sellTotal: sum(sells),
+      buyCount: buys.length,
+      sellCount: sells.length,
       sorted: [...rows].sort((a, b) =>
         String(a.transaction_date || "").localeCompare(String(b.transaction_date || ""))
       ),
@@ -180,16 +180,14 @@ function TransactionsPage() {
         badges={
           <>
             <Pill tone="onDark">{rows.length} records</Pill>
-            <Pill tone="pos">{buys.length} buys</Pill>
-            <Pill tone="neg">{sells.length} sells</Pill>
           </>
         }
         actions={<MonthInput value={month} onChange={(e) => setMonth(e.target.value)} />}
       />
 
       <StatGrid cols="grid-cols-2">
-        <Stat label="Total Buy" value={dollars(buyTotal)} tone="pos" hint={`${buys.length} orders`} />
-        <Stat label="Total Sell" value={dollars(sellTotal)} tone="neg" hint={`${sells.length} orders`} />
+        <Stat label="Total Buy" value={dollars(buyTotal)} tone="pos" hint={`${buyCount} orders`} />
+        <Stat label="Total Sell" value={dollars(sellTotal)} tone="neg" hint={`${sellCount} orders`} />
       </StatGrid>
 
       <ErrorNote>{error}</ErrorNote>

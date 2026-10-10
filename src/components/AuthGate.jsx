@@ -34,16 +34,22 @@ export default function AuthGate({ children }) {
     return (
       <>
         {children}
-        <button
-          onClick={async () => {
-            await signOut();
-            sessionStorage.clear();
-            setStatus("out");
-          }}
-          className="fixed bottom-2 right-2 z-50 rounded-md border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground shadow-sm"
-        >
-          Sign out
-        </button>
+        <footer className="border-t border-border bg-background">
+          <div className="mx-auto flex w-full max-w-7xl justify-end px-2 py-3 sm:px-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await signOut();
+                sessionStorage.clear();
+                setStatus("out");
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
+        </footer>
       </>
     );
   }

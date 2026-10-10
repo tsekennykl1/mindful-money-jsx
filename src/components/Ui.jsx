@@ -27,7 +27,9 @@ export function PageHeader({ title, subtitle, badges, actions, back }) {
         {subtitle ? (
           <p className="mt-0.5 truncate text-[11px] opacity-70 sm:text-xs">{subtitle}</p>
         ) : null}
-        {badges ? <div className="mt-1.5 flex flex-wrap gap-1">{badges}</div> : null}
+        {badges ? (
+          <div className="mt-1.5 flex flex-wrap gap-1 text-base sm:text-xl">{badges}</div>
+        ) : null}
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
         {actions}
@@ -60,7 +62,7 @@ export function Pill({ tone = "neutral", children, className }) {
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap sm:text-xs",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap",
         pillTones[tone] || pillTones.neutral,
         className
       )}
@@ -92,7 +94,7 @@ export function Section({ title, subtitle, badge, right, defaultOpen = true, chi
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-w-0 items-center gap-1.5 text-left"
+          className="flex min-w-0 items-center gap-1.5 text-left text-sm sm:text-lg"
         >
           <ChevronDown
             size={15}
@@ -101,7 +103,7 @@ export function Section({ title, subtitle, badge, right, defaultOpen = true, chi
               !open && "-rotate-90"
             )}
           />
-          <span className="truncate text-[13px] font-bold sm:text-sm">{title}</span>
+          <span className="truncate font-bold">{title}</span>
           {subtitle ? (
             <span className="hidden truncate text-xs text-muted-foreground sm:inline">
               {subtitle}
@@ -109,7 +111,7 @@ export function Section({ title, subtitle, badge, right, defaultOpen = true, chi
           ) : null}
           {badge}
         </button>
-        <div className="flex shrink-0 items-center gap-1.5">{right}</div>
+        <div className="flex shrink-0 items-center gap-1.5 text-sm sm:text-lg">{right}</div>
       </header>
       {open ? <div>{children}</div> : null}
     </Card>
