@@ -17,10 +17,11 @@ import {
   inputClass,
 } from "../components/Ui";
 import { dollars, isISODate, todayISO, toISODate } from "../lib/format";
-import { AiSuggest } from "../components/AiSuggest";
 import {
+  DAILY_AMOUNT_STEP,
   DEFAULT_DAILY_ROWS,
   buildDailyComment,
+  displayExpenseComment,
   cleanRows,
   rowsFromComment,
   rowsTotal,
@@ -97,7 +98,7 @@ function DailyExpensePage() {
   }, [date]);
 
   const total = useMemo(() => rowsTotal(rows), [rows]);
-  const preview = useMemo(() => (cleanRows(rows).length ? buildDailyComment(rows) : "[]"), [rows]);
+  const preview = useMemo(() => displayExpenseComment(buildDailyComment(rows)) || "—", [rows]);
 
   const updateRow = (index, patch) =>
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
@@ -154,14 +155,6 @@ function DailyExpensePage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
-        <AiSuggest
-          onApply={({ category, label }) =>
-            setRows((prev) => [
-              ...prev.filter((r) => r.category || r.amount || r.notes),
-              { category, amount: "", notes: label },
-            ])
-          }
-        />
         <form onSubmit={submit} className="flex flex-col gap-3">
           <Card>
             <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-surface px-2.5 py-2">
@@ -186,7 +179,8 @@ function DailyExpensePage() {
                   <input
                     className={`${inputClass} num text-right`}
                     type="number"
-                    step="0.01"
+                    step={DAILY_AMOUNT_STEP}
+                    aria-label={`${row.category || "Row"} amount`}
                     inputMode="decimal"
                     value={row.amount}
                     onChange={(e) => updateRow(i, { amount: e.target.value })}
@@ -219,11 +213,11 @@ function DailyExpensePage() {
 
           <Card className="p-2.5">
             <p className="mb-1 text-[11px] font-semibold text-muted-foreground">
-              Saved to ledger comment as
+              Comment
             </p>
-            <pre className="scroll-x rounded-md bg-surface p-2 font-mono text-[11px] leading-snug whitespace-pre">
+            <p className="rounded-md bg-surface p-2 text-xs leading-relaxed break-words">
               {preview}
-            </pre>
+            </p>
           </Card>
 
           <div className="flex justify-end gap-2">

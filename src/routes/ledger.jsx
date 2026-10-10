@@ -24,6 +24,7 @@ import {
   inputClass,
 } from "../components/Ui";
 import { currentYearMonth, dollars, num, tone, toISODate, todayISO } from "../lib/format";
+import { displayExpenseComment } from "../lib/dailyComment";
 
 export const Route = createFileRoute("/ledger")({
   head: () => ({
@@ -231,8 +232,8 @@ function LedgerPage() {
                 header: "Comment",
                 priority: 2,
                 cell: (r) => (
-                  <span className="block max-w-[260px] truncate text-muted-foreground">
-                    {r.comment || "—"}
+                  <span className="block max-w-[360px] whitespace-normal text-muted-foreground">
+                    {displayExpenseComment(r.comment) || "—"}
                   </span>
                 ),
               },

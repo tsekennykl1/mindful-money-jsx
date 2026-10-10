@@ -133,9 +133,10 @@ function Dashboard() {
   return (
     <Page>
       <PageHeader
+        compact
         title="Personal Finance"
         subtitle={report.retrievalDatetime ? `Prices as of ${report.retrievalDatetime}` : "Monthly report"}
-        badges={<Pill tone="onDark">Month {yearMonth}</Pill>}
+        badges={<Pill tone="onDark" className="text-[11px] sm:text-xs">Month {yearMonth}</Pill>}
         actions={
           <Button variant="onDark" type="button" onClick={reload} disabled={loading}>
             <RefreshCw size={13} className={loading ? "spin-slow" : ""} />

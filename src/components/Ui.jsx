@@ -19,19 +19,19 @@ export function Page({ children }) {
   );
 }
 
-export function PageHeader({ title, subtitle, badges, actions, back }) {
+export function PageHeader({ title, subtitle, badges, actions, back, compact = false }) {
   return (
     <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg bg-header px-3 py-2.5 text-header-foreground sm:px-4 sm:py-3">
-      <div className="min-w-0">
+      <div className={cx("min-w-0", compact && "contents sm:block")}>
         <h1 className="truncate text-base font-bold tracking-tight sm:text-xl">{title}</h1>
         {subtitle ? (
-          <p className="mt-0.5 truncate text-[11px] opacity-70 sm:text-xs">{subtitle}</p>
+          <p className={cx("mt-0.5 truncate text-[11px] opacity-70 sm:text-xs", compact && "row-start-2 col-start-1 mt-0 self-center sm:mt-0.5")}>{subtitle}</p>
         ) : null}
         {badges ? (
-          <div className="mt-1.5 flex flex-wrap gap-1 text-base sm:text-xl">{badges}</div>
+          <div className={cx("mt-1.5 flex flex-wrap gap-1 text-base sm:text-xl", compact && "row-start-2 col-start-2 mt-0 justify-end self-center sm:mt-1.5 sm:justify-start")}>{badges}</div>
         ) : null}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+      <div className={cx("flex shrink-0 flex-wrap items-center justify-end gap-1.5", compact && "row-start-1 col-start-2")}>
         {actions}
         {back ? (
           <Link

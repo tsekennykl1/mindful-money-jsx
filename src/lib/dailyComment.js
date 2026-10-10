@@ -5,9 +5,11 @@
 //
 // Line 2 only appears when at least one note is filled in.
 
-import { num } from "./format";
+import { dollars, num } from "./format";
 
-export const DEFAULT_DAILY_ROWS = ["Breakfast", "Lunch", "Dinner", "Travel"].map((category) => ({
+export const DAILY_AMOUNT_STEP = 1;
+
+export const DEFAULT_DAILY_ROWS = ["Breakfast", "Lunch", "Dinner", "Travel", "Supermarket"].map((category) => ({
   category,
   amount: "",
   notes: "",
@@ -109,4 +111,17 @@ export function rowsFromComment(comment) {
 
 export function rowsTotal(rows) {
   return cleanRows(rows).reduce((s, r) => s + num(r.amount), 0);
+}
+
+/** Readable display only; keep the original serialized comment when saving. */
+export function displayExpenseComment(comment) {
+  const { items, notes } = parseDailyComment(comment);
+  const tidy = (value) => String(value || "").replace(/[\[\]"]/g, "").trim();
+  if (items) {
+    return items.map((item) => {
+      const note = tidy(notes?.get(item.category));
+      return `${tidy(item.category)}: ${dollars(item.amount)}${note ? ` (${note})` : ""}`;
+    }).join(" · ");
+  }
+  return tidy(comment).replace(/\s*\n\s*/g, " · ");
 }

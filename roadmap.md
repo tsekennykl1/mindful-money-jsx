@@ -1,0 +1,3 @@
+- [x] Change daily amount arrows to $1 and add Supermarket.
+- [x] Remove category suggestions and tidy displayed expense comments.
+- [x] Fit the home title section into two lines on iPhone and verify changes.
